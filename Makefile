@@ -6,11 +6,11 @@
 #    By: ysabik <ysabik@student.42.fr>              +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2023/11/17 06:25:02 by ysabik            #+#    #+#              #
-#    Updated: 2023/11/17 06:53:40 by ysabik           ###   ########.fr        #
+#    Updated: 2023/11/18 15:22:47 by ysabik           ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
-CC					= cc
+CC					= gcc
 CFLAGS				= -Werror -Wall -Wextra
 INCLUDES			= .
 NAME				= minitalk
