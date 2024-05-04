@@ -6,7 +6,7 @@
 /*   By: ysabik <ysabik@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/11/17 06:30:36 by ysabik            #+#    #+#             */
-/*   Updated: 2024/05/04 12:07:49 by ysabik           ###   ########.fr       */
+/*   Updated: 2024/05/04 14:33:18 by ysabik           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -96,6 +96,7 @@ int	main(void)
 {
 	struct sigaction	sa;
 
+	sa = (struct sigaction){0};
 	write(1, "PID: ", 5);
 	ft_put_number(getpid());
 	write(1, "\n", 1);

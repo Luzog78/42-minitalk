@@ -6,12 +6,11 @@
 /*   By: ysabik <ysabik@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/11/17 06:30:36 by ysabik            #+#    #+#             */
-/*   Updated: 2024/05/04 12:07:24 by ysabik           ###   ########.fr       */
+/*   Updated: 2024/05/04 14:24:16 by ysabik           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <unistd.h>
-#include <signal.h>
+#include "client.h"
 
 int	g_received = 0;
 
@@ -33,17 +32,16 @@ static void	ft_send_size(int pid, const char *str)
 	while (sent < 32)
 	{
 		if (str_len & (1 << (31 - sent)))
-			kill(pid, SIGUSR2);
+			ft_kill(pid, SIGUSR2);
 		else
-			kill(pid, SIGUSR1);
-		while (!g_received)
-			pause();
-		g_received = 0;
+			ft_kill(pid, SIGUSR1);
+		if (g_received)
+			break ;
 		sent++;
 	}
 }
 
-static void	send(int pid, const char *str)
+static void	ft_send(int pid, const char *str)
 {
 	int				sent;
 	unsigned char	curr;
@@ -53,20 +51,22 @@ static void	send(int pid, const char *str)
 	{
 		curr = *str;
 		sent = 0;
-		while (sent < 8)
+		while (sent < 8 && !g_received)
 		{
 			if (curr & (1 << (7 - sent)))
-				kill(pid, SIGUSR2);
+				ft_kill(pid, SIGUSR2);
 			else
-				kill(pid, SIGUSR1);
-			while (!g_received)
-				pause();
-			g_received = 0;
+				ft_kill(pid, SIGUSR1);
 			sent++;
 		}
 		str++;
 	}
-	write(1, "The message was successfully transmitted !\n", 43);
+	if (g_received < 0)
+		write(2, "Error: Could not send the message\n", 34);
+	else if (g_received > 0)
+		write(2, "Error: Timout while waiting for acknowledgment\n", 47);
+	else
+		write(1, "The message was successfully transmitted !\n", 43);
 }
 
 static int	ft_uatoi(const char *str)
@@ -92,16 +92,16 @@ int	main(int argc, char **argv)
 
 	if (argc != 3)
 	{
-		write(1, "Usage: ./client [PID] [MESSAGE]\n", 31);
+		write(2, "Usage: ./client [PID] [MESSAGE]\n", 32);
 		return (1);
 	}
 	pid = ft_uatoi(argv[1]);
 	if (pid <= 0)
 	{
-		write(1, "Invalid PID\n", 12);
+		write(2, "Error: Invalid PID\n", 19);
 		return (1);
 	}
 	signal(SIGUSR1, action);
-	send(pid, argv[2]);
-	return (0);
+	ft_send(pid, argv[2]);
+	return (!!g_received);
 }
