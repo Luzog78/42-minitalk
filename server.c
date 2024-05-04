@@ -6,59 +6,99 @@
 /*   By: ysabik <ysabik@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/11/17 06:30:36 by ysabik            #+#    #+#             */
-/*   Updated: 2023/11/17 09:02:20 by ysabik           ###   ########.fr       */
+/*   Updated: 2024/05/04 12:07:49 by ysabik           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <unistd.h>
-#include <signal.h>
+#include "server.h"
 
-int	ft_printf(const char *format, ...);
+static void	ft_receive_size(t_data *data, int sig)
+{
+	data->len <<= 1;
+	if (sig == SIGUSR2)
+		data->len |= 1;
+	if (++data->received_bits == 32)
+	{
+		if (data->len == 0)
+			*data = (t_data){0};
+		else
+		{
+			data->type = MESSAGE;
+			data->received_chars = 0;
+			data->received_bits = 0;
+			data->message = malloc(data->len + 1);
+			if (data->message == NULL)
+				*data = (t_data){0};
+			else
+				data->message[data->len] = 0;
+		}
+	}
+}
 
-/**
- * An int is 4*4 bits long,
- * A char is only 1*4 bits long.
- * ==> `data` will use the first 3*8 bits to store the amount of received bits
- * ==> `data` will use the last 1*8 bits to store the received bit
- * 
- * --> 0000 0000  0000 0000  0000 0000  1111 1111 <--
- *    |    Amount of received bits    ||  Char   |
-*/
-unsigned int	data;
+static void	ft_receive_message(t_data *data, int sig)
+{
+	data->message[data->received_chars] <<= 1;
+	if (sig == SIGUSR2)
+		data->message[data->received_chars] |= 1;
+	if (++data->received_bits == 8)
+	{
+		if (++data->received_chars == data->len)
+		{
+			write(1, data->message, data->len);
+			write(1, "\n", 1);
+			free(data->message);
+			*data = (t_data){0};
+		}
+		else
+			data->received_bits = 0;
+	}
+}
 
 static void	action(int sig, siginfo_t *info, void *context)
 {
-	unsigned int	tmp;
+	static t_data	data = {0};
 
 	(void) context;
 	if (info->si_pid == 0)
 		return ;
-	tmp = data % 256;
-	tmp <<= 1;
-	if (sig == SIGUSR2)
-		tmp += 1;
-	data = (data >> 8) + 1;
-	if (data >= 8)
+	if (data.client_pid == 0)
+		data.client_pid = info->si_pid;
+	else if (data.client_pid != info->si_pid)
 	{
-		if (tmp)
-			write(1, &(char){ tmp }, 1);
-		else
-		{
-			write(1, "\n", 1);
-			kill(info->si_pid, SIGUSR1);
-		}
-		data = 0;
+		data = (t_data){0};
+		data.client_pid = info->si_pid;
 	}
+	if (data.type == SIZE)
+		ft_receive_size(&data, sig);
 	else
-		data = (data << 8) + tmp;
+		ft_receive_message(&data, sig);
+	kill(info->si_pid, SIGUSR1);
+}
+
+static void	ft_put_number(int n)
+{
+	if (n == -2147483648)
+	{
+		write(1, "-2147483648", 11);
+		return ;
+	}
+	if (n < 0)
+	{
+		write(1, "-", 1);
+		n = -n;
+	}
+	if (n >= 10)
+		ft_put_number(n / 10);
+	write(1, &(char){(n % 10) + '0'}, 1);
 }
 
 int	main(void)
 {
 	struct sigaction	sa;
 
-	data = 0;
-	ft_printf("PID: %d\n", getpid());
+	write(1, "PID: ", 5);
+	ft_put_number(getpid());
+	write(1, "\n", 1);
 	sa.sa_sigaction = &action;
 	sa.sa_flags = SA_SIGINFO;
 	sigaction(SIGUSR1, &sa, NULL);

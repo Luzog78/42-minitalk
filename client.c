@@ -6,22 +6,41 @@
 /*   By: ysabik <ysabik@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/11/17 06:30:36 by ysabik            #+#    #+#             */
-/*   Updated: 2023/11/21 06:05:07 by ysabik           ###   ########.fr       */
+/*   Updated: 2024/05/04 12:07:24 by ysabik           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <unistd.h>
 #include <signal.h>
 
-int	ft_uatoi(const char *str);
-
-int	received;
+int	g_received = 0;
 
 static void	action(int sig)
 {
 	(void) sig;
-	received = 1;
-	write(1, "The message was successfully transmitted !\n", 43);
+	g_received = 1;
+}
+
+static void	ft_send_size(int pid, const char *str)
+{
+	int	sent;
+	int	str_len;
+
+	str_len = 0;
+	while (str[str_len])
+		str_len++;
+	sent = 0;
+	while (sent < 32)
+	{
+		if (str_len & (1 << (31 - sent)))
+			kill(pid, SIGUSR2);
+		else
+			kill(pid, SIGUSR1);
+		while (!g_received)
+			pause();
+		g_received = 0;
+		sent++;
+	}
 }
 
 static void	send(int pid, const char *str)
@@ -29,7 +48,8 @@ static void	send(int pid, const char *str)
 	int				sent;
 	unsigned char	curr;
 
-	while(*str)
+	ft_send_size(pid, str);
+	while (*str)
 	{
 		curr = *str;
 		sent = 0;
@@ -39,30 +59,49 @@ static void	send(int pid, const char *str)
 				kill(pid, SIGUSR2);
 			else
 				kill(pid, SIGUSR1);
+			while (!g_received)
+				pause();
+			g_received = 0;
 			sent++;
-			usleep(100);
 		}
 		str++;
 	}
-	sent = 0;
-	while (sent < 8)
+	write(1, "The message was successfully transmitted !\n", 43);
+}
+
+static int	ft_uatoi(const char *str)
+{
+	long long	res;
+
+	res = 0;
+	while (*str)
 	{
-		kill(pid, SIGUSR1);
-		sent++;
-		usleep(100);
+		if (*str < '0' || *str > '9')
+			return (-1);
+		res = res * 10 + *str - '0';
+		if (res > 2147483647)
+			return (-1);
+		str++;
 	}
+	return ((int) res);
 }
 
 int	main(int argc, char **argv)
 {
 	int	pid;
-	
+
 	if (argc != 3)
-		return (0);
+	{
+		write(1, "Usage: ./client [PID] [MESSAGE]\n", 31);
+		return (1);
+	}
 	pid = ft_uatoi(argv[1]);
+	if (pid <= 0)
+	{
+		write(1, "Invalid PID\n", 12);
+		return (1);
+	}
 	signal(SIGUSR1, action);
 	send(pid, argv[2]);
-	while (!received)
-		pause();
 	return (0);
 }
